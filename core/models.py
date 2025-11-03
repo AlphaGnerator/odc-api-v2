@@ -52,6 +52,8 @@ class Cook(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="cook_profile")
     full_name = models.CharField(max_length=100)
     phone_number = models.CharField(max_length=20, unique=True)
+    has_set_availability = models.BooleanField(default=False) # <-- ADD THIS
+    availability_last_updated = models.DateTimeField(null=True, blank=True) #
     years_of_experience = models.PositiveSmallIntegerField(default=0)
     onboarding_quiz_score = models.PositiveSmallIntegerField(default=0)
     cooking_test_score = models.PositiveSmallIntegerField(default=0)

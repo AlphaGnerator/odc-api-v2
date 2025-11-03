@@ -88,3 +88,26 @@ class GenerateUploadUrlView(APIView):
             method="PUT",
         )
         return Response({"signed_url": url})
+class CookAvailabilityView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        try:
+            cook_profile = request.user.cook_profile
+        except Cook.DoesNotExist:
+            return Response({"error": "Cook profile not found."}, status=status.HTTP_404_NOT_FOUND)
+        
+        slots_data = request.data.get('slots')
+        if not isinstance(slots_data, list):
+            return Response({"error": "Invalid 'slots' data."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            AvailabilitySlot.objects.filter(cook=cook_profile).delete()
+            for slot_data in slots_data:
+                AvailabilitySlot.objects.create(cook=cook_profile, **slot_data)
+            
+            cook_profile.has_set_availability = True
+            cook_profile.save()
+            return Response({"status": "success"})
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
