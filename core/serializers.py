@@ -1,3 +1,5 @@
+# In odc-api/core/serializers.py (FINAL, CORRECTED VERSION)
+
 from django.contrib.auth.models import User
 from rest_framework import serializers
 from .models import (
@@ -29,6 +31,7 @@ class DishSerializer(serializers.ModelSerializer):
             'video_url', 'time_to_cook_minutes', 'recipe_steps',
             'special_instructions', 'required_utensils'
         ]
+
 # ==============================================================================
 #  Cook, Area & Availability Serializers
 # ==============================================================================
@@ -45,18 +48,20 @@ class AvailabilitySlotSerializer(serializers.ModelSerializer):
 
 class CookSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True)
+    wallet_balance = serializers.DecimalField(source='wallet.balance', read_only=True, max_digits=10, decimal_places=2)
     class Meta:
         model = Cook
-        fields = ['id', 'user', 'full_name', 'phone_number', 'years_of_experience', 'password', 'has_set_availability']
-        read_only_fields = ['user', 'has_set_availability']
+        fields = ['id', 'user', 'full_name', 'phone_number', 'years_of_experience', 'password', 'has_set_availability', 'wallet_balance']
+        read_only_fields = ['user', 'has_set_availability','wallet_balance']
     def create(self, validated_data):
         user = User.objects.create_user(username=validated_data['phone_number'], password=validated_data.pop('password'))
         cook = Cook.objects.create(user=user, **validated_data)
         return cook
 
-# ... (Add this serializer near the end of the file)
 class ScheduledTaskSerializer(serializers.ModelSerializer):
     dish = DishSerializer(read_only=True)
     class Meta:
         model = ScheduledTask
-        fields = ['id', 'dish', 'dish_name', 'date', 'start_time', 'estimated_duration_minutes', 'status', 'cook_earnings']
+        # --- THIS IS THE FIX ---
+        # I have removed the non-existent 'dish_name' field from this list.
+        fields = ['id', 'dish', 'date', 'start_time', 'estimated_duration_minutes', 'status', 'cook_earnings']

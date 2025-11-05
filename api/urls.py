@@ -12,6 +12,7 @@ router.register(r'ingredients', views.IngredientViewSet); router.register(r'task
 urlpatterns = [
     path('health', views.health),
     path('api/auth/login/', TokenObtainPairView.as_view()),
+    path('api/cook-dashboard/', views.cook_dashboard_summary),
     path('api/cook/availability/', views.CookAvailabilityView.as_view()),
     path('api/', include(router.urls)),
 ]

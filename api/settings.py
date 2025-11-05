@@ -5,7 +5,7 @@ import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-fallback-key-for-local-dev')
-DEBUG = False # Set to False for production
+DEBUG = True # Set to False for production
 ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [

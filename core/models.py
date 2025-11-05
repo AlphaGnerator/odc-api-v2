@@ -53,6 +53,7 @@ class Cook(models.Model):
     full_name = models.CharField(max_length=100)
     phone_number = models.CharField(max_length=20, unique=True)
     has_set_availability = models.BooleanField(default=False) # <-- ADD THIS
+    wallet_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     availability_last_updated = models.DateTimeField(null=True, blank=True) #
     years_of_experience = models.PositiveSmallIntegerField(default=0)
     onboarding_quiz_score = models.PositiveSmallIntegerField(default=0)
@@ -107,3 +108,44 @@ class ScheduledTask(models.Model):
 
     def __str__(self):
             return f"{self.cook.full_name} - {self.dish.name} on {self.date}"
+# Add this class to the BOTTOM of core/models.py
+
+class ScheduledTask(models.Model):
+    class Status(models.TextChoices):
+        SCHEDULED = 'SCHEDULED', 'Scheduled'
+        COMPLETED = 'COMPLETED', 'Completed'
+    
+    cook = models.ForeignKey(Cook, on_delete=models.CASCADE, related_name='tasks')
+    # We need the Dish model for this to work, so let's add it back too.
+    dish_name = models.CharField(max_length=150, default="General Task")
+    date = models.DateField()
+    start_time = models.TimeField()
+    cook_earnings = models.DecimalField(max_digits=6, decimal_places=2, default=0.00)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.SCHEDULED)
+#
+# ... (all your existing models like Cook, Dish, etc. are above this) ...
+#
+
+# ADD THIS NEW MODEL AT THE END OF THE FILE
+class Wallet(models.Model):
+    # This creates a unique, one-to-one link between a Cook and a Wallet.
+    # If a Cook is deleted, their Wallet is also deleted.
+    cook = models.OneToOneField(
+        Cook,
+        on_delete=models.CASCADE,
+        related_name='wallet'
+    )
+
+    # We use DecimalField for money to avoid rounding errors.
+    # This can store up to 99,999,999.99.
+    balance = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0.00
+    )
+
+    last_updated = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        # This will show a helpful name in the Django admin area.
+        return f"Wallet for {self.cook.id}"

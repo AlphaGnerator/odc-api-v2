@@ -11,6 +11,8 @@ import os, datetime
 from google.cloud import storage
 from .models import *
 from .serializers import *
+from .models import ScheduledTask 
+from .serializers import ScheduledTaskSerializer 
 
 # ==============================================================================
 #  API Endpoints
@@ -111,3 +113,38 @@ class CookAvailabilityView(APIView):
             return Response({"status": "success"})
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+# Add this function at the bottom of core/views.py
+# Add this function at the bottom of core/views.py
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+# In odc-api-v2/core/views.py
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def cook_dashboard_summary(request):
+    """Provides a summary of earnings and upcoming tasks for the logged-in cook."""
+    try:
+        cook_profile = request.user.cook_profile
+    except Cook.DoesNotExist:
+        return Response({"error": "This user is not a cook."}, status=status.HTTP_404_NOT_FOUND)
+
+    today = timezone.now().date()
+    todays_earnings = ScheduledTask.objects.filter(
+        cook=cook_profile, 
+        status=ScheduledTask.Status.COMPLETED,
+        date=today
+    ).aggregate(total=Sum('cook_earnings'))['total'] or 0.00
+    
+    upcoming_tasks = ScheduledTask.objects.filter(
+        cook=cook_profile, 
+        date__gte=today, 
+        status=ScheduledTask.Status.SCHEDULED
+    ).order_by('date', 'start_time')
+    
+    return Response({
+        'wallet_balance': cook_profile.wallet.balance,
+        'todays_earnings': todays_earnings,
+        'upcoming_schedule': ScheduledTaskSerializer(upcoming_tasks, many=True).data,
+        'cook_name': cook_profile.full_name or request.user.username
+    })
