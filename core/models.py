@@ -1,8 +1,10 @@
-# In odc-api/core/models.py (FINAL, CORRECTED VERSION)
+# In odc-api/core/models.py (CORRECTED AGAIN)
 
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.db.models.signals import post_save  # <-- ADD THIS LINE
+from django.dispatch import receiver           # <-- ADD THIS LINE
 
 # ==============================================================================
 #  Dish & Ingredient Models
@@ -14,15 +16,11 @@ class Ingredient(models.Model):
 class Dish(models.Model):
     name = models.CharField(max_length=150, unique=True)
     description = models.TextField(blank=True)
-    
-    # --- NEW FIELDS ---
     video_url = models.URLField(max_length=512, blank=True)
     time_to_cook_minutes = models.PositiveSmallIntegerField(default=30)
-    recipe_steps = models.TextField(blank=True) # For step-by-step instructions
+    recipe_steps = models.TextField(blank=True)
     special_instructions = models.TextField(blank=True)
     required_utensils = models.CharField(max_length=255, blank=True)
-    # ------------------
-
     ingredients = models.ManyToManyField(Ingredient, through='DishIngredient', blank=True)
 
     def __str__(self):
@@ -32,29 +30,32 @@ class DishIngredient(models.Model):
     class Unit(models.TextChoices):
         GRAMS = 'g', 'Grams'; ML = 'ml', 'Milliliters'; PIECES = 'pcs', 'Pieces';
         TSP = 'tsp', 'Teaspoon'; TBSP = 'tbsp', 'Tablespoon'; UNIT = 'unit', 'Unit'
+    
     dish = models.ForeignKey(Dish, on_delete=models.CASCADE)
     ingredient = models.ForeignKey(Ingredient, on_delete=models.CASCADE)
     quantity = models.DecimalField(max_digits=7, decimal_places=2)
     unit = models.CharField(max_length=5, choices=Unit.choices)
     is_must_have = models.BooleanField(default=True)
+    
     def __str__(self): return f"{self.dish.name} - {self.quantity}{self.unit} of {self.ingredient.name}"
 
 # ==============================================================================
-#  Cook & Availability Models
+#  Cook, Area & Availability Models
 # ==============================================================================
 class ServiceArea(models.Model):
     pincode = models.CharField(max_length=10, unique=True)
     city = models.CharField(max_length=50)
     name = models.CharField(max_length=100, blank=True)
+    
     def __str__(self): return f"{self.pincode} ({self.name}, {self.city})"
 
 class Cook(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="cook_profile")
     full_name = models.CharField(max_length=100)
     phone_number = models.CharField(max_length=20, unique=True)
-    has_set_availability = models.BooleanField(default=False) # <-- ADD THIS
-    wallet_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    availability_last_updated = models.DateTimeField(null=True, blank=True) #
+    has_set_availability = models.BooleanField(default=False)
+    # wallet_balance is now handled by the Wallet model
+    availability_last_updated = models.DateTimeField(null=True, blank=True)
     years_of_experience = models.PositiveSmallIntegerField(default=0)
     onboarding_quiz_score = models.PositiveSmallIntegerField(default=0)
     cooking_test_score = models.PositiveSmallIntegerField(default=0)
@@ -108,44 +109,25 @@ class ScheduledTask(models.Model):
 
     def __str__(self):
             return f"{self.cook.full_name} - {self.dish.name} on {self.date}"
-# Add this class to the BOTTOM of core/models.py
 
-class ScheduledTask(models.Model):
-    class Status(models.TextChoices):
-        SCHEDULED = 'SCHEDULED', 'Scheduled'
-        COMPLETED = 'COMPLETED', 'Completed'
-    
-    cook = models.ForeignKey(Cook, on_delete=models.CASCADE, related_name='tasks')
-    # We need the Dish model for this to work, so let's add it back too.
-    dish_name = models.CharField(max_length=150, default="General Task")
-    date = models.DateField()
-    start_time = models.TimeField()
-    cook_earnings = models.DecimalField(max_digits=6, decimal_places=2, default=0.00)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.SCHEDULED)
-#
-# ... (all your existing models like Cook, Dish, etc. are above this) ...
-#
-
-# ADD THIS NEW MODEL AT THE END OF THE FILE
 class Wallet(models.Model):
-    # This creates a unique, one-to-one link between a Cook and a Wallet.
-    # If a Cook is deleted, their Wallet is also deleted.
     cook = models.OneToOneField(
         Cook,
         on_delete=models.CASCADE,
         related_name='wallet'
     )
-
-    # We use DecimalField for money to avoid rounding errors.
-    # This can store up to 99,999,999.99.
     balance = models.DecimalField(
         max_digits=10,
         decimal_places=2,
         default=0.00
     )
-
     last_updated = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        # This will show a helpful name in the Django admin area.
-        return f"Wallet for {self.cook.id}"
+        return f"Wallet for {self.cook.full_name}"
+
+# Signal to create a Wallet automatically when a new Cook is created
+@receiver(post_save, sender=Cook)
+def create_cook_wallet(sender, instance, created, **kwargs):
+    if created:
+        Wallet.objects.create(cook=instance)

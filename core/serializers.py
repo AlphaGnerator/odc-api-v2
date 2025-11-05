@@ -1,10 +1,10 @@
-# In odc-api/core/serializers.py (FINAL, CORRECTED VERSION)
+# In odc-api/core/serializers.py (CORRECTED)
 
 from django.contrib.auth.models import User
 from rest_framework import serializers
 from .models import (
     Cook, ServiceArea, AvailabilitySlot,
-    Ingredient, Dish, DishIngredient, ScheduledTask
+    Ingredient, Dish, DishIngredient, ScheduledTask, Wallet
 )
 
 # ==============================================================================
@@ -48,20 +48,29 @@ class AvailabilitySlotSerializer(serializers.ModelSerializer):
 
 class CookSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True)
+    # Correctly sources the balance from the related Wallet model
     wallet_balance = serializers.DecimalField(source='wallet.balance', read_only=True, max_digits=10, decimal_places=2)
+    
     class Meta:
         model = Cook
-        fields = ['id', 'user', 'full_name', 'phone_number', 'years_of_experience', 'password', 'has_set_availability', 'wallet_balance']
+        # Removed 'years_of_experience' to match the simplified signup form
+        fields = ['id', 'user', 'full_name', 'phone_number', 'password', 'has_set_availability', 'wallet_balance']
         read_only_fields = ['user', 'has_set_availability','wallet_balance']
+
     def create(self, validated_data):
-        user = User.objects.create_user(username=validated_data['phone_number'], password=validated_data.pop('password'))
+        # This logic correctly creates a User and a linked Cook profile
+        user = User.objects.create_user(
+            username=validated_data['phone_number'], 
+            password=validated_data.pop('password')
+        )
         cook = Cook.objects.create(user=user, **validated_data)
         return cook
 
 class ScheduledTaskSerializer(serializers.ModelSerializer):
+    # This now correctly nests the full Dish object, which is what the frontend expects
     dish = DishSerializer(read_only=True)
+    
     class Meta:
         model = ScheduledTask
-        # --- THIS IS THE FIX ---
-        # I have removed the non-existent 'dish_name' field from this list.
+        # The incorrect 'dish_name' field is removed and replaced by 'dish'
         fields = ['id', 'dish', 'date', 'start_time', 'estimated_duration_minutes', 'status', 'cook_earnings']
